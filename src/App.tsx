@@ -1,48 +1,25 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorMessage, FilterStatus, Todo } from './types/Todo';
 import { deleteTodo, getTodos, updateTodo } from './api/todos';
 import { TodoList } from './components/TodoList';
 import { HeaderTodoApp } from './components/HeaderTodoApp';
 import { FooterTodoApp } from './components/FooterTodoApp';
-import { filterTodo, findTodoById } from './utils/helpers';
+import {
+  filterTodo,
+  findTodoById,
+  normalizeTodosLoading,
+} from './utils/helpers';
 import { TodoError } from './components/TodoError';
 
 export const App: React.FC = () => {
-  // console.log('render app');
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [errorMessage, setErrorMessage] = useState<ErrorMessage>(
     ErrorMessage.DEFAULT,
   );
   const [filterStatus, setFilterStatus] = useState(FilterStatus.DEFAULT);
-  // console.log(todos)
-  // console.log(errorMessage);
-  const isAllChecked = useRef(false);
-
-  //effects
-  // const getTodosFromServer = () => {
-  //   getTodos()
-  //     .then(setTodos)
-  //     .catch(() => {
-  //       setErrorMessage(ErrorMessage.TODO_LOAD);
-  //     });
-  // };
-
-  // const getErrorTimerForMessage = () => {
-  //   if (errorMessage !== ErrorMessage.DEFAULT) {
-  //     const timeOutID = setTimeout(() => {
-  //       setErrorMessage(ErrorMessage.DEFAULT);
-  //     }, 3000);
-
-  //     return () => {
-  //       clearTimeout(timeOutID);
-  //     };
-  //   }
-
-  //   return;
-  // };
 
   useEffect(() => {
     getTodos()
@@ -52,60 +29,40 @@ export const App: React.FC = () => {
       });
   }, []);
 
-  // useEffect(() => {
-  //   // if (errorMessage !== ErrorMessage.DEFAULT && timeOut) {
-  //   //   timeOut.current = setTimeout(() => {
-  //   //     setErrorMessage(ErrorMessage.DEFAULT);
-  //   //   }, 3000);
-  //   // }
-
-  //   // return () => {
-  //   //   clearTimeout(timeOut.current);
-  //   // };
-  //   const timer = setTimeout(() => {
-  //     console.log('+++++')
-  //     setErrorMessage(ErrorMessage.DEFAULT);
-  //   }, 3000);
-
-  //   return () => {
-  //     clearTimeout(timer);
-  //   };
-  // }, [errorMessage]);
-
   const filteredTodos = useMemo(() => {
     return filterTodo(todos, filterStatus);
   }, [todos, filterStatus]);
 
   //handlers
+  const setErrorDefault = () => {
+    setErrorMessage(ErrorMessage.DEFAULT);
+  };
+
   const handleAddTodo = (newTodo: Todo) => {
     setTodos([...todos, newTodo]);
   };
 
   const handleUpdateTodo = (updatedTodo: Todo) => {
+    const todosWithLoading = todos.map(todo =>
+      todo.id === updatedTodo.id ? { ...todo, loading: true } : todo,
+    );
+
+    setTodos(todosWithLoading);
+
     updateTodo(updatedTodo)
       .then(updatedTodoFS => {
-        setTodos(
-          todos.map(todo =>
-            todo.id === updatedTodoFS.id ? updatedTodo : todo,
-          ),
+        const updatedTodos: Todo[] = todos.map(todo =>
+          todo.id === updatedTodoFS.id ? updatedTodo : todo,
         );
+
+        setTodos(updatedTodos);
       })
       .catch(() => {
         setErrorMessage(ErrorMessage.TODO_UPDATE);
-      });
+      })
+      .finally(() => setTodos(prevTodos => normalizeTodosLoading(prevTodos)));
   };
 
-  // const handleOnChangeTodoStatus = (id: number) => {
-  //   const currentTodo = findTodoById(todos, id);
-
-  //   if (currentTodo) {
-  //     currentTodo.completed = !currentTodo.completed;
-  //     setTodos(
-  //       todos.map(todo => (todo.id === currentTodo.id ? currentTodo : todo)),
-  //     );
-  //   }
-  // };
-  //update
   const handleOnChangeTodoStatus = (id: number) => {
     const currentTodo = findTodoById(todos, id);
 
@@ -115,36 +72,90 @@ export const App: React.FC = () => {
     }
   };
 
+  //i'll redo this
   const handleCheckAll = () => {
-    if (todos.every(todo => todo.completed)) {
-      isAllChecked.current = false;
+    if (
+      todos.every(todo => todo.completed) ||
+      todos.every(todo => !todo.completed)
+    ) {
+      const todosToChange = todos.map(todo => ({
+        ...todo,
+        completed: !todo.completed,
+      }));
+      const todosWithLoading = todos.map(todo => ({ ...todo, loading: true }));
+
+      setTodos(todosWithLoading);
+
+      Promise.all([...todosToChange.map(todo => updateTodo(todo))])
+        .then(setTodos)
+        .catch(() => setErrorMessage(ErrorMessage.TODO_UPDATE))
+        .finally(() => setTodos(prevTodos => normalizeTodosLoading(prevTodos)));
     } else {
-      isAllChecked.current = true;
+      const unCompletedTodos = todos
+        .filter(todo => !todo.completed)
+        .map(todo => ({ ...todo, completed: !todo.completed }));
+
+      setTodos(
+        todos.map(todo => {
+          if (!todo.completed) {
+            return { ...todo, loading: true };
+          }
+
+          return todo;
+        }),
+      );
+
+      Promise.all([...unCompletedTodos.map(todo => updateTodo(todo))])
+        .then(updatedTodosFS => {
+          let newTodos: Todo[] = [...todos];
+
+          updatedTodosFS.forEach(todoFS => {
+            newTodos = newTodos.map(todo => {
+              if (todo.id === todoFS.id) {
+                return todoFS;
+              }
+
+              return todo;
+            });
+          });
+          setTodos(newTodos);
+        })
+        .catch(() => setErrorMessage(ErrorMessage.TODO_UPDATE))
+        .finally(() => setTodos(prevTodos => normalizeTodosLoading(prevTodos)));
     }
-
-    setTodos(todos.map(todo => ({ ...todo, completed: isAllChecked.current })));
   };
-  //important to rehash what is going on;
 
-  const handleOnDelete = (
-    todoId: number,
-    setIsLoadingTodo: (sts: boolean) => void,
-  ) => {
-    // setIsLoadingTodo(true);
+  const handleOnDelete = (todoId: number) => {
+    setTodos(prev => {
+      const setLoadingTodo = prev.map(todo => {
+        if (todo.id === todoId) {
+          return { ...todo, loading: true };
+        }
+
+        return todo;
+      });
+
+      return setLoadingTodo;
+    });
+
     deleteTodo(todoId)
       .then(() => {
-        setTodos(todos.filter(todo => todo.id !== todoId));
+        setTodos(prev => prev.filter(todo => todo.id !== todoId));
       })
       .catch(() => {
         setErrorMessage(ErrorMessage.TODO_DELETE);
       })
       .finally(() => {
-        setIsLoadingTodo(false);
+        setTodos(prevTodos => normalizeTodosLoading(prevTodos));
       });
   };
 
   const handleClearAllCompleted = () => {
-    setTodos(todos.filter(todo => !todo.completed));
+    const completedTodos = todos.filter(todo => todo.completed);
+
+    completedTodos.forEach(todo => {
+      handleOnDelete(todo.id);
+    });
   };
 
   return (
@@ -163,13 +174,13 @@ export const App: React.FC = () => {
         <TodoList
           tempTodo={tempTodo}
           todos={filteredTodos}
-          OnUpdateTodo={handleUpdateTodo}
-          OnChangeTodoStatus={handleOnChangeTodoStatus}
-          OnDelete={handleOnDelete}
+          onUpdateTodo={handleUpdateTodo}
+          onChangeTodoStatus={handleOnChangeTodoStatus}
+          onDelete={handleOnDelete}
         />
 
         {/* Hide the footer if there are no todos */}
-        {todos.length > 0 && (
+        {!!todos.length && (
           <FooterTodoApp
             todos={todos}
             setFilterStatus={setFilterStatus}
@@ -179,28 +190,9 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* DON'T use conditional rendering to hide the notification */}
-      {/* Add the 'hidden' class to hide the message smoothly */}
-      {/* <div
-        data-cy="ErrorNotification"
-        className={cn(
-          'notification is-danger is-light has-text-weight-normal',
-          {
-            hidden: !errorMessage,
-          },
-        )}
-      >
-        <button
-          data-cy="HideErrorButton"
-          type="button"
-          className="delete"
-          onClick={() => setErrorMessage(ErrorMessage.DEFAULT)}
-        />
-        {errorMessage}
-      </div> */}
       <TodoError
         errorMessage={errorMessage}
-        setErrorMessage={setErrorMessage}
+        setErrorDefault={setErrorDefault}
       />
     </div>
   );

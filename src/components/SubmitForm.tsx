@@ -12,22 +12,20 @@ interface Props {
 
   updateTodo?: Todo;
   setIsUpdate?: (val: boolean) => void;
-  OnUpdateTodo?: (todo: Todo) => void;
-  OnDelete?: (id: number, setIsLoadingTodo: (sts: boolean) => void) => void;
-  setIsLoadingTodo?: (state: boolean) => void;
+  onUpdateTodo?: (todo: Todo) => void;
+  onDelete?: (id: number) => void;
 }
 
 export const SubmitForm: React.FC<Props> = ({
   inputPlaceHolder,
   todos,
   onAddTodo,
-  setErrorMessage = () => {},
+  setErrorMessage,
   updateTodo,
   setIsUpdate,
-  OnUpdateTodo,
+  onUpdateTodo,
   inputClassName,
-  OnDelete,
-  setIsLoadingTodo,
+  onDelete,
   setTempTodo,
 }) => {
   const [inputQuery, setInputQuery] = useState(updateTodo?.title || '');
@@ -37,23 +35,13 @@ export const SubmitForm: React.FC<Props> = ({
 
   useEffect(() => {
     focusInput.current?.focus();
-  }, [isDisableInput]);
-  // const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  }, [isDisableInput, todos]);
 
-  const isAdd = todos && onAddTodo && /*setErrorMessage &&*/ setTempTodo;
-  const isUpdate =
-    updateTodo && setIsUpdate && OnUpdateTodo && OnDelete && setIsLoadingTodo;
+  const isAdd = todos && onAddTodo && setErrorMessage && setTempTodo;
+  const isUpdate = updateTodo && setIsUpdate && onUpdateTodo && onDelete;
 
   const handleOnSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    // console.log('hello');
-    if (!inputQuery.trim()) {
-      setErrorMessage(ErrorMessage.TODO_ADD);
-
-      return;
-    }
-    // setErrorMessage(ErrorMessage.DEFAULT);
-    // console.log(setErrorMessage);
 
     if (isUpdate) {
       if (inputQuery.trim()) {
@@ -64,35 +52,38 @@ export const SubmitForm: React.FC<Props> = ({
           completed: updateTodo.completed,
         };
 
-        OnUpdateTodo(updatedTodo);
-      } else {
         setInputQuery('');
-        OnDelete(updateTodo.id, setIsLoadingTodo);
+        onUpdateTodo(updatedTodo);
+      } else {
+        onDelete(updateTodo.id);
       }
 
       setIsUpdate(false);
     }
 
     if (isAdd) {
+      setErrorMessage(ErrorMessage.DEFAULT);
+
+      if (!inputQuery.trim()) {
+        setErrorMessage(ErrorMessage.TITLE_EMPTY);
+
+        return;
+      }
+
       const newTodo = {
-        id: isFinite(Math.max(...todos.map(todo => todo.id)) + 1)
-          ? Math.max(...todos.map(todo => todo.id)) + 1
-          : +Math.random().toFixed(16).slice(2),
+        id: 0,
         userId: USER_ID,
         title: inputQuery.trim(),
         completed: false,
+        loading: true,
       };
-      // console.log(newTodo)
 
       setIsDisableInput(true);
       setTempTodo(newTodo);
       addTodo(newTodo)
         .then(newTodoFS => {
-          // setErrorMessage(ErrorMessage.DEFAULT); // ????
-
-          // console.log(newTodoFS);
           onAddTodo(newTodoFS);
-          setInputQuery(''); //???
+          setInputQuery('');
         })
         .catch(() => {
           setErrorMessage(ErrorMessage.TODO_ADD);
@@ -106,8 +97,6 @@ export const SubmitForm: React.FC<Props> = ({
 
   const handleOnBlur = () => {
     if (isUpdate) {
-      // setIsUpdate(false);
-
       if (inputQuery.trim()) {
         const updatedTodo = {
           id: updateTodo.id,
@@ -116,9 +105,9 @@ export const SubmitForm: React.FC<Props> = ({
           completed: updateTodo.completed,
         };
 
-        OnUpdateTodo(updatedTodo);
+        onUpdateTodo(updatedTodo);
       } else {
-        OnDelete(updateTodo.id, setIsLoadingTodo);
+        onDelete(updateTodo.id);
       }
 
       setIsUpdate(false);

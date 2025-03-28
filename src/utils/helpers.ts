@@ -14,3 +14,7 @@ export const filterTodo = (todos: Todo[], filterStatus: FilterStatus) => {
 export const findTodoById = (todos: Todo[], id: number) => {
   return todos.find(todo => todo.id === id);
 };
+
+export const normalizeTodosLoading = (todos: Todo[]) => {
+  return todos.map(todo => ({ ...todo, loading: false }));
+};

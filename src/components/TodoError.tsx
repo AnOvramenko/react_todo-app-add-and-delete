@@ -4,33 +4,22 @@ import cn from 'classnames';
 
 interface Props {
   errorMessage: ErrorMessage;
-  setErrorMessage: (msg: ErrorMessage) => void;
+  setErrorDefault: () => void;
 }
 
-export const TodoError: FC<Props> = ({ errorMessage, setErrorMessage }) => {
-  // useEffect(() => {
-  //   if (errorMessage !== ErrorMessage.DEFAULT) {
-  //     const timer = setTimeout(() => {
-  //       console.log('+++++');
-  //       setErrorMessage(ErrorMessage.DEFAULT);
-  //     }, 3000);
-
-  //     return () => {
-  //       clearTimeout(timer);
-  //     };
-  //   }
-
-  //   return;
-  // }, [errorMessage]);
+export const TodoError: FC<Props> = ({ errorMessage, setErrorDefault }) => {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // console.log('+++++');
-      setErrorMessage(ErrorMessage.DEFAULT);
-    }, 3000);
+    if (errorMessage !== ErrorMessage.DEFAULT) {
+      const timer = setTimeout(() => {
+        setErrorDefault();
+      }, 3000);
 
-    return () => {
-      clearTimeout(timer);
-    };
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+
+    return;
   }, [errorMessage]);
 
   return (
@@ -44,7 +33,7 @@ export const TodoError: FC<Props> = ({ errorMessage, setErrorMessage }) => {
         data-cy="HideErrorButton"
         type="button"
         className="delete"
-        onClick={() => setErrorMessage(ErrorMessage.DEFAULT)}
+        onClick={setErrorDefault}
       />
       {errorMessage}
     </div>

@@ -3,8 +3,10 @@ import { client } from '../utils/fetchClient';
 
 export const USER_ID = 2496;
 
-export const getTodos = () => {
-  return client.get<Todo[]>(`/todos?userId=${USER_ID}`);
+export const getTodos = (completed?: boolean) => {
+  return client.get<Todo[]>(
+    `/todos?userId=${USER_ID}${completed !== undefined ? `&completed=${completed}` : ''}`,
+  );
 };
 
 export const deleteTodo = (todoId: number) => {
